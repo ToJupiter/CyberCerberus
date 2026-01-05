@@ -1,0 +1,3 @@
+https://raw.githubusercontent.com/romainmarcoux/malicious-domains/refs/heads/main/full-domains-aa.txt
+https://raw.githubusercontent.com/romainmarcoux/malicious-domains/refs/heads/main/full-domains-ab.txt
+https://raw.githubusercontent.com/romainmarcoux/malicious-domains/refs/heads/main/full-domains-ac.txt

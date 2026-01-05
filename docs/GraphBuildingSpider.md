@@ -1,10 +1,19 @@
+Materials:
+1. A spider.py file, getting the website content and hyperlinks and a csv with domains acting as seed domains. Then, from the seed domains, we start to iterate through all of the domains (the domains given in the hyperlinks) to create a network of graph linking domains, websites together. We chain them altogether, in order to create a network of websites. Find me some ways to detect if the website is protected by captcha. For textual content of the website, we can save it using polars with parquet. For network linking, find me a way to store it effectively because we will be using it later on for graph convolutional network testing.
+
+Goal:
+1. Limit the network to around 1M nodes (1M domains). Chain them together using torch_geometric or networkx. 
+2. Save the text to polars parquet.
+3. Try to solve me the problem of this: this problem is for bad vs good web content classification using web content. But the original domain may not contain the bad content but rather a subdomain of it may contain bad things. Find me solutions to solve this because this means it may not reflect the right picture! But if we craft subdomains into graph, it is too huge. We cannot manage such big thing!
+
+# spider.py
+``` py
 import asyncio
 import aiohttp
 import csv
 import json
 import logging
 import os
-import re
 from typing import List, Dict, Any, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -27,7 +36,7 @@ class Spider:
         self.concurency_limit = asyncio.Semaphore(concurency_limit)
         self.timeout = aiohttp.ClientTimeout(timeout)
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; WebsiteCategorizer/1.0; +https://example.com/bot    )"
+            "User-Agent": "Mozilla/5.0 (compatible; WebsiteCategorizer/1.0; +https://example.com/bot)"
         }
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
@@ -35,11 +44,6 @@ class Spider:
         self.domain_to_id = {}
         self.current_max_id = 0
         self._lock = asyncio.Lock()
-        
-        # New attributes
-        self.blocked_domains = set()
-        self.keyword_pattern = None
-        self.seed_domains = set()
 
     async def _get_domain_id(self, domain: str) -> int:
         """Thread-safe ID assignment for graph nodes."""
@@ -156,25 +160,15 @@ class Spider:
                 async with session.get(target_url, headers=self.headers) as response:
                     if response.status == 200:
                         html_content = await response.text()
-                        parsed_data = await self._parse_html(target_url, html_content)
+                        parsed_data = self._parse_html(target_url, html_content)
                         result["text"] = parsed_data["text"]
                         result["is_captcha"] = parsed_data["is_captcha"]
 
                         unique_targets = set()
                         for link in parsed_data["links"]:
                             norm_target = self._normalize_domain(link)
-                            
-                            if not norm_target or norm_target == normalized_domain:
-                                continue
-                                
-                            # Fast filtering
-                            if norm_target in self.blocked_domains:
-                                continue
-                            
-                            if self.keyword_pattern and self.keyword_pattern.search(link):
-                                continue
-
-                            unique_targets.add(norm_target)
+                            if norm_target and norm_target != normalized_domain:
+                                unique_targets.add(norm_target)
                         
                         result["edges"] = list(unique_targets)
 
@@ -231,18 +225,7 @@ class Spider:
             df_edges.write_parquet(f"{self.output_dir}/edges_batch_{file_suffix}.parquet")
             logger.info(f"Saved batch {file_suffix}: {len(df_edges)} edges.")
 
-    def set_filters(self, blocked_domains: List[str], blocked_keywords: List[str]):
-        self.blocked_domains = set(d.lower() for d in blocked_domains if d)
-        if blocked_keywords:
-            pattern_str = '|'.join(re.escape(k) for k in blocked_keywords if k)
-            self.keyword_pattern = re.compile(pattern_str, re.IGNORECASE)
-        else:
-            self.keyword_pattern = None
-
-    def set_seeds(self, seeds: List[str]):
-        self.seed_domains = set(s.lower() for s in seeds if s)
-
-    async def process_csv(self, csv_file_path: str, filter_csv_path: str = "filters.csv", batch_size: int = 1000):
+    async def process_csv(self, csv_file_path: str, batch_size: int = 1000):
         """
         Main entry point. Reads CSV and orchestrates async crawling.
         """
@@ -259,31 +242,14 @@ class Spider:
         except FileNotFoundError:
             logger.error(f"CSV file not found: {csv_file_path}")
             return []
-
-        blocked_domains = []
-        blocked_keywords = []
-        if filter_csv_path and os.path.exists(filter_csv_path):
-            try:
-                with open(filter_csv_path, "r", encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        if "domains" in row and row["domains"].strip():
-                            blocked_domains.append(row["domains"].strip())
-                        if "keywords" in row and row["keywords"].strip():
-                            blocked_keywords.append(row["keywords"].strip())
-            except Exception as e:
-                logger.error(f"Error loading filters: {e}")
-
-        self.set_filters(blocked_domains, blocked_keywords)
-        self.set_seeds([d["domain"] for d in domains_to_crawl])
-
-        logger.info(f"Loaded {len(domains_to_crawl)} domains. Filters: {len(blocked_domains)} domains, {len(blocked_keywords)} keywords.")
+        logger.info(f"Loaded {len(domains_to_crawl)} domains from CSV. Starting crawl...")
 
         connector = aiohttp.TCPConnector(limit=0, ttl_dns_cache=300)
 
         async with aiohttp.ClientSession(connector=connector, timeout=self.timeout) as session:
             total_batches = (len(domains_to_crawl) + batch_size - 1) // batch_size
             for i in tqdm(range(0, len(domains_to_crawl), batch_size), total=total_batches, desc="Crawling batches"):
+            # for i in range(0, len(domains_to_crawl), batch_size):
                 batch = domains_to_crawl[i:i + batch_size]
                 tasks = []
 
@@ -291,6 +257,7 @@ class Spider:
                     task = self._fetch_single(session, item['domain'], item['classification'])
                     tasks.append(task)
                 
+                logger.info(f"Processing batch {i//batch_size + 1} ({len(batch)} domains)...")
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 
                 clean_results = []
@@ -303,3 +270,13 @@ class Spider:
                 self._save_batch(clean_results, i//batch_size + 1)
 
         logger.info("Crawling finished.")
+```
+
+--- Request 2:
+1. For the spider.py code, change the logic of the function to achieve this goal:
+
+1/ Classification propagation: If a malicious/adult/illegal seed links to many domains, those might also be malicious/adult/illegal. Prioritize those category linking over randomized breadt first search.
+
+2/Edge weight tracking: Domains linked by many seeds are more important. When we iterate through a hyperlink domain, check if it links with multiple domains in our existing base. Prioritize those domains which links with more seed domains.
+
+3/ Domain filtering: Exclude common CDNs, social media, etc.... We will be reading a csv with 2 columns: domains and keywords. Ignore the hyperlinks if they have the domains or keywords in the list. Find some way for this operation to be fast!

@@ -14,6 +14,7 @@ dependencies = [
     "polars>=1.36.1",
     "pydantic-settings>=2.1.0",
     "scikit-learn>=1.8.0",
+    "tldextract>=5.3.1",
     "torch>=2.9.1",
     "torch-geometric>=2.7.0",
     "torchvision>=0.24.1",
