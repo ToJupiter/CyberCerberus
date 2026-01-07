@@ -35,7 +35,7 @@ class AdblockDomainChecker:
         self.concurrency_limit = concurrency_limit
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.output_file = output_file
-        self.classification = "nsfw_ad"  # Changed classification
+        self.classification = "adult"  # Changed classification
         
         # Compile regex filter if provided
         self.regex_filter = None
@@ -346,7 +346,7 @@ class AdblockDomainChecker:
 async def main():
     """Main function to run the domain checker."""
     # Configuration
-    ADBLOCK_FILE = "oisd_nsfw.txt"  # Your Adblock Plus file
+    ADBLOCK_FILE = "data/abp_nsfw.txt"  # Your Adblock Plus file
     OUTPUT_CSV = "adblock_reachable_domains.csv"
     CONCURRENCY_LIMIT = 100  # Simultaneous connections
     TIMEOUT = 5  # Seconds per request
@@ -359,7 +359,7 @@ async def main():
     #   "track|analytics" - for tracking domains
     #   "hello|test|demo" - for specific keywords
     #   "" or None - to disable filtering
-    REGEX_FILTER = None  # Change to your desired pattern
+    REGEX_FILTER = "porn|sex|xxx|xhamster|xvideos|pornhub"  # Change to your desired pattern
     
     # Create checker instance
     checker = AdblockDomainChecker(

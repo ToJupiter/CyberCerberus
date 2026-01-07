@@ -246,7 +246,7 @@ class DomainPinger:
 async def main():
     """Main function to run the domain checker."""
     # Configuration
-    HOSTS_FILE = "gambling.txt"  # Your hosts file
+    HOSTS_FILE = "data/gambling.txt"  # Your hosts file
     OUTPUT_CSV = "gambling_domains.csv"
     CONCURRENCY_LIMIT = 200  # Simultaneous connections
     TIMEOUT = 5  # Seconds per request
