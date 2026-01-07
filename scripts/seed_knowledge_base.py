@@ -1,11 +1,12 @@
+# seed_knowledge_base.py
 import asyncio
 import logging
 import argparse
 import os
-from src.crawler.spider import Spider  # Assuming the Spider class is in spider.py
+
+from src.crawler.spider import Spider  # assuming spider.py is in same dir (or adjust import path as needed)
 
 def setup_logging(log_level=logging.INFO):
-    """Configure logging format and level."""
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -26,44 +27,41 @@ def main():
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     
     args = parser.parse_args()
-    
-    # Validate input files
+
     if not os.path.exists(args.seed_csv):
         logging.error(f"Seed CSV file not found: {args.seed_csv}")
         return
-    
+
     if args.filters_csv and not os.path.exists(args.filters_csv):
         logging.warning(f"Filters CSV file not found: {args.filters_csv}. Proceeding without filters.")
-    
-    # Setup logging
+
     log_level = logging.DEBUG if args.debug else logging.INFO
     setup_logging(log_level)
-    
+
     logger = logging.getLogger(__name__)
     logger.info(f"Starting crawler with seed file: {args.seed_csv}")
     logger.info(f"Using filters file: {args.filters_csv}")
     logger.info(f"Output directory: {args.output_dir}")
     logger.info(f"Concurrency limit: {args.concurrency}, Timeout: {args.timeout}s")
-    
+
     try:
-        # Initialize spider
         spider = Spider(
-            concurency_limit=args.concurrency,
+            concurrency_limit=args.concurrency,  # ← fixed typo: was 'concurency_limit'
             timeout=args.timeout,
             output_dir=args.output_dir
         )
-        
-        # Run the crawler
+
         asyncio.run(
             spider.process_csv(
                 csv_file_path=args.seed_csv,
                 filter_csv_path=args.filters_csv,
-                batch_size=args.batch_size
+                batch_size=args.batch_size,
+                max_iterations=5
             )
         )
-        
+
         logger.info("Crawling completed successfully!")
-        
+
     except Exception as e:
         logger.error(f"Critical error during crawling: {e}", exc_info=True)
         raise
