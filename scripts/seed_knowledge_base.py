@@ -4,7 +4,7 @@ import logging
 import argparse
 import os
 
-from src.crawler.spider import Spider  # assuming spider.py is in same dir (or adjust import path as needed)
+from src.crawler.spider import Spider
 
 def setup_logging(log_level=logging.INFO):
     logging.basicConfig(
@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--filters_csv', type=str, default='filters.csv', help='Path to filters CSV file (optional)')
     parser.add_argument('--output_dir', type=str, default='output', help='Directory to save output files')
     parser.add_argument('--concurrency', type=int, default=128, help='Maximum concurrent connections')
-    parser.add_argument('--timeout', type=int, default=5, help='Request timeout in seconds')
+    parser.add_argument('--timeout', type=int, default=20, help='Request timeout in seconds')
     parser.add_argument('--batch_size', type=int, default=1000, help='Number of domains to process per batch')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     
@@ -46,7 +46,7 @@ def main():
 
     try:
         spider = Spider(
-            concurrency_limit=args.concurrency,  # ← fixed typo: was 'concurency_limit'
+            concurency_limit=args.concurrency, 
             timeout=args.timeout,
             output_dir=args.output_dir
         )
@@ -55,8 +55,7 @@ def main():
             spider.process_csv(
                 csv_file_path=args.seed_csv,
                 filter_csv_path=args.filters_csv,
-                batch_size=args.batch_size,
-                max_iterations=5
+                batch_size=args.batch_size            
             )
         )
 

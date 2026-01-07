@@ -4,29 +4,25 @@ import csv
 import logging
 import os
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Set
 from urllib.parse import urljoin, urlparse
-from collections import Counter
 
 import uvloop
-import polars as pl
 import tldextract
 import lxml.html
-from lxml.etree import ParserError
-import tqdm as tqdm
+import polars as pl
+from tqdm import tqdm
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger = logging.getLogger(__name__)
 
 class Spider:
-    def __init__(self, concurency_limit: int = 256, timeout: int = 15, output_dir: str = "output"):
+    def __init__(self, concurency_limit: int = 128, timeout: int = 20, output_dir: str = "output"):
         self.concurency_limit = asyncio.Semaphore(concurency_limit)
-        self.timeout = aiohttp.ClientTimeout(total=timeout)
+        self.timeout = aiohttp.ClientTimeout(timeout)
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
+            "User-Agent": "Mozilla/5.0 (compatible; WebsiteCategorizer/1.0; +https://example.com/bot)"
         }
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
@@ -38,11 +34,10 @@ class Spider:
         self.blocked_domains = set()
         self.keyword_pattern = None
         self.seed_domains = set()
-        self.visited_domains = set()
-        self.url_regex = re.compile(
-            r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+[/\w\.-]*(?:\?[\w=&%]*)?(?:#[\w\-]*)?|'
-            r'www\.(?:[-\w.]|(?:%[\da-fA-F]{2}))+[/\w\.-]*(?:\?[\w=&%]*)?(?:#[\w\-]*)?'
-        )
+        
+        self.re_script = re.compile(r'<(script|style|noscript|iframe)[^>]*>.*?</\1>|<!--.*?-->', re.IGNORECASE | re.DOTALL)
+        self.re_cdata = re.compile(r'//<!\[CDATA\[.*?//\]\]>', re.IGNORECASE | re.DOTALL)
+        self.re_url_text = re.compile(r'https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9]{1,6}\b(?:[-a-zA-Z0-9@:%_\+.~#?&//=]*)')
 
     def set_filters(self, blocked_domains: List[str], blocked_keywords: List[str]):
         self.blocked_domains = set(d.lower() for d in blocked_domains if d)
@@ -52,6 +47,16 @@ class Spider:
         else:
             self.keyword_pattern = None
 
+    def set_seeds(self, seeds: List[str]):
+        self.seed_domains = set(self._normalize_domain(s) or s.lower() for s in seeds if s)
+
+    async def _get_domain_id(self, domain: str) -> int:
+        async with self._lock:
+            if domain not in self.domain_to_id:
+                self.domain_to_id[domain] = self.current_max_id
+                self.current_max_id += 1
+            return self.domain_to_id[domain]
+    
     def _detect_captcha(self, html_content: str) -> bool:
         if not html_content:
             return False
@@ -59,222 +64,183 @@ class Spider:
         patterns = [
             "/cdn-cgi/challenge-platform",
             "challenges.cloudflare.com/turnstile",
+            "checking if the site connection is secure",
             "cf-chl-widget",
+            "just a moment...",
             "recaptcha",
             "g-recaptcha",
-            "checking if the site connection is secure"
+            "data-sitekey"
         ]
         return any(p in content_lower for p in patterns)
     
-    def _normalize_domain(self, url: str) -> Optional[str]:
+    def _normalize_domain(self, url: str) -> str:
         try:
-            if not url:
-                return None
-            if not url.startswith(('http://', 'https://')):
-                url = 'https://' + url
             extracted = tldextract.extract(url)
             if extracted.suffix and extracted.domain:
                 return f"{extracted.domain}.{extracted.suffix}"
-            return None
         except Exception:
-            return None
+            pass
+        return None
     
-    def _clean_text(self, text: str) -> str:
-        if not text:
-            return ""
-        text = re.sub(r'//<!\[CDATA\[.*?//\]\]>', '', text, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
-        text = re.sub(r'[^\x20-\x7E]', ' ', text)
-        return " ".join(text.split())
-
-    def _parse_html(self, url: str, html_content: str) -> Dict[str, Any]:
+    def _clean_and_parse(self, url: str, html_content: str) -> Dict[str, Any]:
         links = set()
-        extracted_text = ""
-        is_captcha = self._detect_captcha(html_content)
-
-        if not is_captcha and html_content:
-            try:
-                doc = lxml.html.fromstring(html_content)
-                doc.make_links_absolute(url)
-
-                for elem in doc.xpath('//script | //style | //noscript | //iframe | //meta | //link | //svg | //comment() | //header | //footer | //nav'):
-                    elem.drop_tree()
-
-                for elem in doc.iter():
-                    for attrib in list(elem.attrib):
-                        if attrib.lower().startswith('on'):
-                            del elem.attrib[attrib]
-
-                for _, _, link, _ in doc.iterlinks():
-                    links.add(link)
-
-                raw_text = doc.text_content()
-                extracted_text = self._clean_text(raw_text)
-
-                for match in self.url_regex.finditer(raw_text):
-                    potential = match.group(0).rstrip('.,;:?\'"')
-                    if potential.startswith('www.'):
-                        potential = 'https://' + potential
-                    links.add(potential)
-
-            except (ParserError, ValueError, Exception):
-                pass
-
+        clean_html = self.re_cdata.sub('', html_content)
+        clean_html = self.re_script.sub('', clean_html)
+        
+        try:
+            doc = lxml.html.fromstring(clean_html)
+            doc.make_links_absolute(url)
+            
+            hrefs = doc.xpath('//a/@href | //link/@href | //area/@href')
+            srcs = doc.xpath('//img/@src | //source/@src | //iframe/@src')
+            
+            for link in hrefs + srcs:
+                links.add(link)
+            
+            text_content = " ".join(doc.xpath('//body//text()')).strip()
+            text_content = re.sub(r'\s+', ' ', text_content)
+            
+        except Exception:
+            text_content = ""
+        
+        text_links = self.re_url_text.findall(text_content)
+        links.update(text_links)
+        
         return {
             "links": sorted(list(links)),
-            "text": extracted_text,
-            "is_captcha": is_captcha
+            "text": text_content,
+            "is_captcha": self._detect_captcha(html_content)
         }
 
     async def _fetch_single(self, session: aiohttp.ClientSession, domain: str, classification: str) -> Dict[str, Any]:
         async with self.concurency_limit:
             target_url = domain if domain.startswith(('http://', 'https://')) else f'https://{domain}'
             
-            try:
-                normalized_domain = self._normalize_domain(target_url) or urlparse(target_url).netloc
-            except ValueError:
-                normalized_domain = domain
-
+            normalized_domain = self._normalize_domain(target_url) or urlparse(target_url).netloc
+            
             result = {
                 "domain": normalized_domain,
                 "full_url": target_url,
                 "classification": classification,
                 "status": "success",
                 "text": "",
+                "error": None,
+                "is_captcha": False,
                 "edges": [],
-                "is_captcha": False
+                "seed_score": 0
             }
 
             try:
-                async with session.get(target_url, headers=self.headers, verify_ssl=False) as response:
+                async with session.get(target_url, headers=self.headers) as response:
                     if response.status == 200:
-                        html_content = await response.text(errors='replace')
-                        parsed = self._parse_html(target_url, html_content)
-                        result["text"] = parsed["text"]
-                        result["is_captcha"] = parsed["is_captcha"]
+                        html_content = await response.text()
+                        parsed_data = self._clean_and_parse(target_url, html_content)
+                        
+                        result["text"] = parsed_data["text"]
+                        result["is_captcha"] = parsed_data["is_captcha"]
                         
                         valid_edges = set()
-                        for link in parsed["links"]:
-                            target_dom = self._normalize_domain(link)
-                            if target_dom and target_dom != normalized_domain:
-                                if target_dom not in self.blocked_domains:
-                                    if not (self.keyword_pattern and self.keyword_pattern.search(link)):
-                                        valid_edges.add(target_dom)
+                        seed_hits = 0
+
+                        for link in parsed_data["links"]:
+                            norm_target = self._normalize_domain(link)
+                            
+                            if not norm_target or norm_target == normalized_domain:
+                                continue
+                            
+                            if norm_target in self.blocked_domains:
+                                continue
+                            
+                            if self.keyword_pattern and self.keyword_pattern.search(link):
+                                continue
+
+                            if norm_target in self.seed_domains:
+                                seed_hits += 1
+
+                            valid_edges.add(norm_target)
+                        
                         result["edges"] = list(valid_edges)
+                        result["seed_score"] = seed_hits
                     else:
                         result["status"] = f"error_{response.status}"
+                        result["error"] = f"HTTP status: {response.status}"
+                
             except asyncio.TimeoutError:
                 result["status"] = "error_timeout"
             except Exception as e:
                 result["status"] = "error_exception"
-            
-            return result
+                result["error"] = str(e)
 
-    def _save_batch(self, results: List[Dict[str, Any]], iteration: int, batch_idx: int):
-        nodes = []
-        edges = []
+            return result
+        
+    def _save_batch(self, results: List[Dict[str, Any]], file_suffix: int):
+        if not results:
+            return
+        
+        node_records = []
+        edge_records = []
         
         for r in results:
-            if r["status"] == "success" and not r["is_captcha"]:
-                nodes.append({
+            if r["status"] == "success":
+                node_records.append({
                     "domain": r["domain"],
                     "classification": r["classification"],
                     "text": r["text"],
                     "is_captcha": r["is_captcha"],
-                    "status": r["status"]
+                    "crawl_status": r["status"],
+                    "seed_score": r["seed_score"]
                 })
+                
                 for target in r["edges"]:
-                    edges.append({"source": r["domain"], "target": target})
-            elif r["status"] != "success":
-                 nodes.append({
-                    "domain": r["domain"],
-                    "classification": r["classification"],
-                    "text": "",
-                    "is_captcha": False,
-                    "status": r["status"]
-                })
-
-        if nodes:
-            pl.DataFrame(nodes).write_parquet(f"{self.output_dir}/nodes_iter{iteration}_batch{batch_idx}.parquet")
-        if edges:
-            pl.DataFrame(edges).write_parquet(f"{self.output_dir}/edges_iter{iteration}_batch{batch_idx}.parquet")
-
-    async def process_csv(self, csv_file_path: str, filter_csv_path: str = "filters.csv", batch_size: int = 1000, max_iterations: int = 5):
-        domains_queue = {}
+                    edge_records.append({
+                        "source": r["domain"],
+                        "target": target
+                    })
         
+        if node_records:
+            pl.DataFrame(node_records).write_parquet(f"{self.output_dir}/nodes_batch_{file_suffix}.parquet")
+        
+        if edge_records:
+            pl.DataFrame(edge_records).write_parquet(f"{self.output_dir}/edges_batch_{file_suffix}.parquet")
+
+    async def process_csv(self, csv_file_path: str, filter_csv_path: str = "filters.csv", batch_size: int = 1000):
+        domains_to_crawl = []
         try:
             with open(csv_file_path, "r", encoding='utf-8') as f:
-                for row in csv.DictReader(f):
-                    d = row["domain"].strip()
-                    domains_queue[d] = row.get("classification", "seed").strip()
+                reader = csv.DictReader(f)
+                for row in reader:
+                    domains_to_crawl.append({
+                        "domain": row["domain"].strip(),
+                        "classification": row["classification"].strip()
+                    })
         except FileNotFoundError:
-            logger.error(f"Input file not found: {csv_file_path}")
+            logger.error(f"CSV file not found: {csv_file_path}")
             return
 
-        if os.path.exists(filter_csv_path):
-            b_dom, b_key = [], []
-            try:
-                with open(filter_csv_path, "r", encoding='utf-8') as f:
-                    for r in csv.DictReader(f):
-                        if r.get("domains"): b_dom.append(r["domains"].strip())
-                        if r.get("keywords"): b_key.append(r["keywords"].strip())
-                self.set_filters(b_dom, b_key)
-            except Exception as e:
-                logger.error(f"Filter load error: {e}")
-
-        connector = aiohttp.TCPConnector(limit=0, ttl_dns_cache=300, ssl=False)
+        blocked_domains = []
+        blocked_keywords = []
         
+        if os.path.exists(filter_csv_path):
+            with open(filter_csv_path, "r", encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get("domains"): blocked_domains.append(row["domains"].strip())
+                    if row.get("keywords"): blocked_keywords.append(row["keywords"].strip())
+
+        self.set_filters(blocked_domains, blocked_keywords)
+        self.set_seeds([d["domain"] for d in domains_to_crawl])
+
+        connector = aiohttp.TCPConnector(limit=0, ttl_dns_cache=300)
+
         async with aiohttp.ClientSession(connector=connector, timeout=self.timeout) as session:
-            current_batch_domains = list(domains_queue.keys())
-            
-            for iteration in range(max_iterations):
-                if not current_batch_domains:
-                    break
+            total_batches = (len(domains_to_crawl) + batch_size - 1) // batch_size
+            for i in tqdm(range(0, len(domains_to_crawl), batch_size), total=total_batches, desc="Crawling batches"):
+                batch = domains_to_crawl[i:i + batch_size]
+                tasks = [self._fetch_single(session, item['domain'], item['classification']) for item in batch]
                 
-                logger.info(f"Iteration {iteration + 1}: Crawling {len(current_batch_domains)} domains")
+                results = await asyncio.gather(*tasks, return_exceptions=True)
                 
-                # Deduplicate and prioritize
-                to_crawl = []
-                for dom in current_batch_domains:
-                    if dom not in self.visited_domains:
-                        to_crawl.append(dom)
-                        self.visited_domains.add(dom)
-                
-                if not to_crawl:
-                    logger.info("No new domains to crawl in this iteration.")
-                    break
-
-                tasks = []
-                for dom in to_crawl:
-                    cls = domains_queue.get(dom, "discovered")
-                    tasks.append(self._fetch_single(session, dom, cls))
-
-                candidate_scores = Counter()
-                total_batches = (len(tasks) + batch_size - 1) // batch_size
-                
-                for i in tqdm(range(0, len(tasks), batch_size), total=total_batches, desc=f"Iter {iteration+1}"):
-                    batch_tasks = tasks[i:i + batch_size]
-                    batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-                    
-                    clean_results = []
-                    for res in batch_results:
-                        if isinstance(res, dict):
-                            clean_results.append(res)
-                            if res.get("edges"):
-                                candidate_scores.update(res["edges"])
-                    
-                    self._save_batch(clean_results, iteration + 1, (i // batch_size) + 1)
-
-                next_batch_candidates = []
-                for domain, _ in candidate_scores.most_common():
-                    if domain not in self.visited_domains:
-                        next_batch_candidates.append(domain)
-                        if len(next_batch_candidates) >= 50000: 
-                            break
-                
-                current_batch_domains = next_batch_candidates
-                for d in current_batch_domains:
-                    if d not in domains_queue:
-                        domains_queue[d] = "discovered"
+                clean_results = [res for res in results if not isinstance(res, Exception)]
+                self._save_batch(clean_results, i // batch_size + 1)
 
         logger.info("Crawling finished.")
