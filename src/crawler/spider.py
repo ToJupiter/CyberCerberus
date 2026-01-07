@@ -260,7 +260,7 @@ class Spider:
         self.set_filters(blocked_domains, blocked_keywords)
         self.set_seeds([d["domain"] for d in domains_to_crawl])
 
-        connector = aiohttp.TCPConnector(limit=0, ttl_dns_cache=300)
+        connector = aiohttp.TCPConnector(force_close=True, ttl_dns_cache=300)
 
         async with aiohttp.ClientSession(connector=connector, timeout=self.timeout) as session:
             total_batches = (len(domains_to_crawl) + batch_size - 1) // batch_size
