@@ -260,18 +260,30 @@ class Spider:
         self.set_filters(blocked_domains, blocked_keywords)
         self.set_seeds([d["domain"] for d in domains_to_crawl])
 
-        connector = aiohttp.TCPConnector(force_close=True, ttl_dns_cache=300)
+        connector = aiohttp.TCPConnector(limit=128, ttl_dns_cache=300)
 
-        async with aiohttp.ClientSession(connector=connector, timeout=self.timeout) as session:
-            total_batches = (len(domains_to_crawl) + batch_size - 1) // batch_size
-            for i in tqdm.tqdm(range(0, len(domains_to_crawl), batch_size), total=total_batches, desc="Crawling batches"):
-                batch = domains_to_crawl[i:i + batch_size]
+        total_batches = (len(domains_to_crawl) + batch_size - 1) // batch_size
+        for i in tqdm.tqdm(range(total_batches), desc="Crawling batches"):
+
+            # batch = domains_to_crawl[i:i + batch_size]
+            # tasks = [self._fetch_single(session, item['domain'], item['classification']) for item in batch]
+            
+            # results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # clean_results = [res for res in results if not isinstance(res, Exception)]
+            # logger.debug(f"Batch {i//batch_size + 1}: {len(results)} total, {len(clean_results)} successful, {len(results) - len(clean_results)} exceptions")
+            # self._save_batch(clean_results, i // batch_size + 1)
+
+            start_idx = i * batch_size
+            end_idx = min(start_idx + batch_size, len(domains_to_crawl))
+            batch = domains_to_crawl[start_idx:end_idx]
+            
+            async with aiohttp.ClientSession(connector=connector, timeout=self.timeout) as session:
                 tasks = [self._fetch_single(session, item['domain'], item['classification']) for item in batch]
-                
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 
                 clean_results = [res for res in results if not isinstance(res, Exception)]
-                logger.debug(f"Batch {i//batch_size + 1}: {len(results)} total, {len(clean_results)} successful, {len(results) - len(clean_results)} exceptions")
-                self._save_batch(clean_results, i // batch_size + 1)
+                self._save_batch(clean_results, i + 1)
 
+        self.domain_to_id.clear()
         logger.info("Crawling finished.")
