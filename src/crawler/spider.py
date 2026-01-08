@@ -260,30 +260,30 @@ class Spider:
         self.set_filters(blocked_domains, blocked_keywords)
         self.set_seeds([d["domain"] for d in domains_to_crawl])
 
-        connector = aiohttp.TCPConnector(limit=128, ttl_dns_cache=300)
-
-        total_batches = (len(domains_to_crawl) + batch_size - 1) // batch_size
-        for i in tqdm.tqdm(range(total_batches), desc="Crawling batches"):
-
-            # batch = domains_to_crawl[i:i + batch_size]
-            # tasks = [self._fetch_single(session, item['domain'], item['classification']) for item in batch]
-            
-            # results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # clean_results = [res for res in results if not isinstance(res, Exception)]
-            # logger.debug(f"Batch {i//batch_size + 1}: {len(results)} total, {len(clean_results)} successful, {len(results) - len(clean_results)} exceptions")
-            # self._save_batch(clean_results, i // batch_size + 1)
-
-            start_idx = i * batch_size
-            end_idx = min(start_idx + batch_size, len(domains_to_crawl))
-            batch = domains_to_crawl[start_idx:end_idx]
-            
+        connector = aiohttp.TCPConnector(limit=0, ttl_dns_cache=300) # limit=0 means no hard limit, relying on semaphore
+        
+        try:
             async with aiohttp.ClientSession(connector=connector, timeout=self.timeout) as session:
-                tasks = [self._fetch_single(session, item['domain'], item['classification']) for item in batch]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                total_batches = (len(domains_to_crawl) + batch_size - 1) // batch_size
                 
-                clean_results = [res for res in results if not isinstance(res, Exception)]
-                self._save_batch(clean_results, i + 1)
+                for i in tqdm.tqdm(range(total_batches), desc="Crawling batches"):
+                    start_idx = i * batch_size
+                    end_idx = min(start_idx + batch_size, len(domains_to_crawl))
+                    batch = domains_to_crawl[start_idx:end_idx]
+                    
+                    if not batch:
+                        continue
 
-        self.domain_to_id.clear()
-        logger.info("Crawling finished.")
+                    tasks = [self._fetch_single(session, item['domain'], item['classification']) for item in batch]
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    
+                    clean_results = [res for res in results if not isinstance(res, Exception)]
+                    
+                    success_count = sum(1 for r in clean_results if r["status"] == "success")
+                    logger.info(f"Batch {i+1}/{total_batches} processed. Success: {success_count}, Errors: {len(batch) - success_count}")
+                    
+                    self._save_batch(clean_results, i + 1)
+
+        finally:
+            self.domain_to_id.clear()
+            logger.info("Crawling finished and resources cleaned up.")

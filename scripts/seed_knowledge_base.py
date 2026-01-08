@@ -28,19 +28,29 @@ def main():
     
     args = parser.parse_args()
 
-    if not os.path.exists(args.seed_csv):
-        logging.error(f"Seed CSV file not found: {args.seed_csv}")
-        return
+    seed_csv_abs = os.path.abspath(args.seed_csv)
+    
+    if not os.path.exists(seed_csv_abs):
+        logging.error(f"Seed CSV file not found at: {seed_csv_abs}")
+        if os.path.exists(args.seed_csv):
+             logging.info(f"Found file using original path: {args.seed_csv}")
+             seed_csv_abs = args.seed_csv
+        else:
+            return
 
-    if args.filters_csv and not os.path.exists(args.filters_csv):
-        logging.warning(f"Filters CSV file not found: {args.filters_csv}. Proceeding without filters.")
+    filters_csv_abs = os.path.abspath(args.filters_csv)
+    if args.filters_csv and not os.path.exists(filters_csv_abs):
+        logging.warning(f"Filters CSV file not found: {filters_csv_abs}. Proceeding without filters.")
+        filters_csv_abs = None
+    else:
+        filters_csv_abs = args.filters_csv
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     setup_logging(log_level)
 
     logger = logging.getLogger(__name__)
-    logger.info(f"Starting crawler with seed file: {args.seed_csv}")
-    logger.info(f"Using filters file: {args.filters_csv}")
+    logger.info(f"Starting crawler with seed file: {seed_csv_abs}")
+    logger.info(f"Using filters file: {filters_csv_abs if filters_csv_abs else 'None'}")
     logger.info(f"Output directory: {args.output_dir}")
     logger.info(f"Concurrency limit: {args.concurrency}, Timeout: {args.timeout}s")
 
@@ -53,8 +63,8 @@ def main():
 
         asyncio.run(
             spider.process_csv(
-                csv_file_path=args.seed_csv,
-                filter_csv_path=args.filters_csv,
+                csv_file_path=seed_csv_abs,
+                filter_csv_path=filters_csv_abs,
                 batch_size=args.batch_size            
             )
         )
