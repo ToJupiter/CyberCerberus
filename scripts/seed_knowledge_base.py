@@ -41,7 +41,7 @@ def main():
     filters_csv_abs = os.path.abspath(args.filters_csv)
     if args.filters_csv and not os.path.exists(filters_csv_abs):
         logging.warning(f"Filters CSV file not found: {filters_csv_abs}. Proceeding without filters.")
-        filters_csv_abs = None
+        filters_csv_abs = args.filters_csv
     else:
         filters_csv_abs = args.filters_csv
 
