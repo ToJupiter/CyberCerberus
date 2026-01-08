@@ -16,4 +16,5 @@ PYTHONPATH=. python scripts/seed_knowledge_base.py --seed_csv data/classified_do
 PYTHONPATH=. python scripts/nsfw_domain_ping.py
 PYTHONPATH=. python scripts/illegal_domain_ping.py
 PYTHONPATH=. python scripts/phishing_domain_ping.py
+PYTHONPATH=. python scripts/domain_classification.py
 ```
