@@ -378,7 +378,7 @@ async def main():
         return
     
     # Optional: Apply additional filtering (e.g., find domains with "hello")
-    additional_filter = "hello"  # Change to your desired substring
+    additional_filter = None  # Change to your desired substring
     if additional_filter:
         filtered_domains = checker.filter_domains_by_pattern(all_domains, additional_filter)
         logger.info(f"Found {len(filtered_domains)} domains containing '{additional_filter}'")
