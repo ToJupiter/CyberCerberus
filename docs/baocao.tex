@@ -1,0 +1,334 @@
+\documentclass[a4paper,12pt]{report}
+
+% --- Gói hỗ trợ tiếng Việt và phông chữ ---
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{times} % Sử dụng font Times New Roman
+
+% --- Gói hỗ trợ toán học ---
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+% --- Gói định dạng trang và bảng ---
+\usepackage{geometry}
+\geometry{left=3cm, right=2cm, top=2cm, bottom=2cm}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{caption}
+
+% --- Gói tạo liên kết (Mục lục click được) ---
+\usepackage[hidelinks]{hyperref}
+
+% --- Định dạng tiêu đề chương (CHƯƠNG 1, CHƯƠNG 2...) ---
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries\centering}{\LARGE CHƯƠNG \thechapter}{10pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
+
+% ==========================================
+% BẮT ĐẦU TÀI LIỆU
+% ==========================================
+\begin{document}
+
+% --- TRANG BÌA ---
+\begin{titlepage}
+    \begin{center}
+        \textbf{\large ĐẠI HỌC BÁCH KHOA HÀ NỘI}\\
+        \textbf{\large TRƯỜNG CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG} \\
+        \rule{10cm}{0.4pt}
+        
+        \vspace{3cm}
+        
+        \textbf{\Huge BÁO CÁO BÀI TẬP LỚN} \\[1cm]
+        \textbf{\Large Đề tài: Phân loại URL lành tính và độc hại}
+        
+        \vspace{1.5cm}
+        
+        \textbf{Học phần:} Nhập môn Học máy và khai phá dữ liệu \\
+        \textbf{GVHD:} PGS. TS. Nguyễn Thị Kim Anh
+        
+        \vspace{2cm}
+        
+        \textbf{\Large Nhóm 17} \\[0.5cm]
+        \begin{tabular}{ll}
+            Phan Hoàng Hải & 20225715 \\
+            Đặng Phương Nam & 20225892 \\
+            Nguyễn Việt Phong & 20225901 \\
+            Nguyễn Lê Minh & 20225651 \\
+            Nguyễn Hoàng Tùng & 20225948 \\
+        \end{tabular}
+        
+        \vfill
+        
+        \textbf{Hà Nội, tháng 01 năm 2026}
+    \end{center}
+\end{titlepage}
+
+% --- MỤC LỤC ---
+\tableofcontents
+\newpage
+
+% --- LỜI NÓI ĐẦU ---
+\chapter*{LỜI NÓI ĐẦU}
+\addcontentsline{toc}{chapter}{LỜI NÓI ĐẦU}
+
+\section*{Danh sách thành viên và phân công công việc}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|l|c|l|c|}
+        \hline
+        \textbf{STT} & \textbf{Họ và tên} & \textbf{MSSV} & \textbf{Công việc thực hiện} & \textbf{Đóng góp} \\
+        \hline
+        1 & Phan Hoàng Hải & 20225715 & & \\ \hline
+        2 & Đặng Phương Nam & 20225892 & & \\ \hline
+        3 & Nguyễn Việt Phong & 20225901 & & \\ \hline
+        4 & Nguyễn Lê Minh & 20225651 & & \\ \hline
+        5 & Nguyễn Hoàng Tùng & 20225948 & & \\ \hline
+    \end{tabular}
+\end{table}
+
+\section*{Giới thiệu đề tài}
+Trong bối cảnh bùng nổ thông tin hiện nay, Internet mang lại nguồn tri thức vô tận nhưng đồng thời cũng tiềm ẩn vô số rủi ro. Không chỉ dừng lại ở các mối đe dọa an ninh truyền thống như lừa đảo (Phishing) hay mã độc (Malware), môi trường mạng ngày nay còn tràn ngập các nội dung không lành mạnh hoặc vi phạm chính sách như web người lớn (Adult) và cờ bạc trực tuyến (Betting). Việc kiểm soát và phân loại các nội dung này là bài toán cấp thiết đối với các tổ chức, trường học và doanh nghiệp nhằm xây dựng một môi trường mạng trong sạch và an toàn.
+
+Xuất phát từ nhu cầu thực tiễn đó, báo cáo này trình bày quá trình xây dựng một hệ thống tự động hóa hoàn chỉnh để phát hiện và phân loại URL. Khác với các phương pháp kiểm tra nhanh chỉ dựa trên danh sách đen, hệ thống của chúng tôi tiếp cận theo hướng phân tích chuyên sâu: thực hiện thu thập dữ liệu (crawling), bóc tách nội dung trang web và áp dụng các kỹ thuật Học máy (Machine Learning).
+
+Mục tiêu của đề tài không chỉ là phát hiện các tấn công mạng mà còn mở rộng sang khả năng nhận diện các nhóm nội dung nhạy cảm, hỗ trợ việc lọc nội dung và quản lý truy cập một cách hiệu quả và chính xác nhất.
+
+% --- CHƯƠNG 1 ---
+\chapter{KHẢO SÁT BÀI TOÁN}
+
+\section{Mô tả bài toán}
+\subsection{Định nghĩa và Phạm vi}
+Bài toán đặt ra là xây dựng một quy trình xử lý (pipeline) tự động có khả năng tiếp nhận danh sách các URL, thực hiện truy cập để lấy dữ liệu và phân loại chúng vào các nhóm cụ thể. Hệ thống cần phân biệt được giữa các trang "Lành tính" (Benign) và các trang thuộc nhóm "Độc hại" hoặc "Không mong muốn".
+
+\subsection{Phân loại đối tượng cần phát hiện}
+Dựa trên các nghiên cứu của Tian et al. và yêu cầu thực tế của hệ thống, các URL mục tiêu cần nhận diện bao gồm hai nhóm chính:
+
+\textbf{1. Nhóm đe dọa an ninh mạng (Malicious):}
+\begin{itemize}
+    \item \textbf{Phishing (Lừa đảo):} Giả mạo giao diện các trang uy tín để đánh cắp thông tin.
+    \item \textbf{Malware (Mã độc):} Các trang phát tán virus, trojan, ransomware.
+    \item \textbf{Defacement \& Spam:} Các trang bị tấn công thay đổi giao diện hoặc chứa nội dung rác.
+\end{itemize}
+
+\textbf{2. Nhóm nội dung nhạy cảm và vi phạm chính sách (Policy Violation):}
+\begin{itemize}
+    \item \textbf{Adult (Nội dung người lớn):} Các trang web chứa nội dung khiêu dâm, không phù hợp với lứa tuổi hoặc môi trường công sở/giáo dục.
+    \item \textbf{Betting (Cờ bạc):} Các trang web tổ chức cá cược, đánh bạc trực tuyến trái phép.
+\end{itemize}
+
+\subsection{Yêu cầu đối với hệ thống}
+Do hệ thống hoạt động theo cơ chế thu thập và phân tích sâu (crawling \& analysis pipeline), các yêu cầu phi chức năng được điều chỉnh như sau:
+\begin{itemize}
+    \item \textbf{Độ chính xác cao (High Accuracy):} Đây là ưu tiên hàng đầu. Hệ thống chấp nhận tốn thời gian xử lý để đảm bảo việc phân loại nội dung (đặc biệt là Adult và Betting) là chính xác, giảm thiểu việc chặn nhầm các trang web hợp pháp.
+    \item \textbf{Khả năng xử lý dữ liệu lớn (Scalability \& Data Handling):} Hệ thống pipeline phải có khả năng quản lý, lưu trữ và xử lý lượng lớn dữ liệu nội dung thô thu thập được từ quá trình crawling.
+    \item \textbf{Phân tích toàn diện (Comprehensive Analysis):} Không chỉ nhìn vào đường dẫn, hệ thống phải "đọc hiểu" được nội dung bên trong để phát hiện các từ khóa nhạy cảm mà URL đơn thuần không thể hiện hết.
+\end{itemize}
+
+\section{Phân tích về URL}
+Dù hệ thống có khả năng phân tích nội dung sâu, việc phân tích đặc trưng từ chuỗi URL (URL-based/Lexical features) vẫn là bước sàng lọc đầu tiên quan trọng trong pipeline:
+\begin{itemize}
+    \item \textbf{Đặc trưng từ vựng:} Phân tích độ dài URL, số lượng ký tự đặc biệt, cấu trúc tên miền.
+    \item \textbf{Nhận diện lừa đảo (Typosquatting):} Phát hiện các kỹ thuật giả mạo tên miền (ví dụ: `rnicrosoft.com') thường thấy ở các trang Phishing.
+    \item \textbf{Từ khóa trong URL:} Đối với nhóm Adult hoặc Betting, đôi khi ngay trong chuỗi URL đã chứa các từ khóa gợi ý (ví dụ: `casino', `bet', `xx...', `adult'). Tuy nhiên, các trang web tinh vi thường che giấu các từ khóa này, đòi hỏi phải có bước phân tích nội dung tiếp theo.
+\end{itemize}
+
+\section{Phân tích về nội dung các trang web}
+Đây là thành phần cốt lõi tạo nên sức mạnh của hệ thống pipeline hiện tại. Việc thu thập (crawling) nội dung trang web cho phép trích xuất các \textbf{Đặc trưng dựa trên nội dung (Content-based features)} một cách chi tiết:
+
+\begin{itemize}
+    \item \textbf{Phân tích văn bản (Text Analysis):} Hệ thống quét toàn bộ văn bản hiển thị để tìm kiếm các từ khóa đặc trưng.
+    \begin{itemize}
+        \item Đối với Betting: Tìm các cụm từ như "tỷ lệ kèo", "nạp rút tiền", "casino trực tuyến", "bóng đá".
+        \item Đối với Adult: Tìm các từ ngữ nhạy cảm, mô tả hành vi tình dục hoặc các cảnh báo độ tuổi (18+).
+    \end{itemize}
+    \item \textbf{Phân tích cấu trúc HTML và Script:} Phát hiện các đoạn mã JavaScript dùng để chuyển hướng (redirect) người dùng sang các trang độc hại khác hoặc phát hiện các form đăng nhập giả mạo.
+\end{itemize}
+
+Lợi thế của phương pháp này là khắc phục điểm yếu của việc chỉ nhìn vào URL. Ví dụ: Một trang web cờ bạc có thể dùng tên miền rất bình thường như \texttt{news-daily24h.com} để qua mặt bộ lọc URL, nhưng nội dung bên trong sẽ lộ rõ bản chất cờ bạc khi được hệ thống crawl và phân tích.
+
+% --- CHƯƠNG 2 ---
+\chapter{THU THẬP DỮ LIỆU}
+\section{Mô tả dữ liệu}
+\textit{(Phần nội dung này chưa có trong dữ liệu đầu vào)}
+
+\section{Phương pháp thu thập}
+\textit{(Phần nội dung này chưa có trong dữ liệu đầu vào)}
+
+% --- CHƯƠNG 3 ---
+\chapter{TIỀN XỬ LÝ DỮ LIỆU}
+\section{Làm sạch dữ liệu}
+\textit{(Phần nội dung này chưa có trong dữ liệu đầu vào)}
+
+\section{Biến đổi dữ liệu}
+\textit{(Phần nội dung này chưa có trong dữ liệu đầu vào)}
+
+% --- CHƯƠNG 4 ---
+\chapter{MÔ HÌNH DỰ ĐOÁN}
+
+\section{Các kĩ thuật sử dụng}
+
+\subsection{TF-IDF}
+Trong bài toán này, để mô hình học máy có thể xử lý được dữ liệu văn bản phi cấu trúc như nội dung trang web, các từ khóa trích xuất từ URL, nhóm sử dụng kỹ thuật \textbf{TF-IDF (Term Frequency - Inverse Document Frequency)}. Đây là phương pháp thống kê nhằm đánh giá mức độ quan trọng của một từ (term) trong một văn bản cụ thể (document) so với toàn bộ tập dữ liệu (corpus).
+
+Trọng số TF-IDF được tính toán dựa trên hai thành phần:
+\begin{itemize}
+    \item \textbf{Term Frequency (TF):} Tần suất xuất hiện của từ $t$ trong văn bản $d$.
+    $$tf(t, d) = \frac{f_{t,d}}{\sum_{t' \in d} f_{t',d}}$$
+    \item \textbf{Inverse Document Frequency (IDF):} Nghịch đảo tần suất văn bản.
+    $$idf(t, D) = \log \left( \frac{N}{|\{d \in D : t \in d\}|} \right)$$
+\end{itemize}
+
+\textbf{Công thức tổng quát:}
+Trọng số cuối cùng của từ $t$ trong văn bản $d$ là tích của TF và IDF:
+$$w_{t,d} = tf(t, d) \times idf(t, D)$$
+
+Kết quả của quá trình này là các vector đặc trưng số học, cho phép mô hình phân biệt rõ ràng giữa các nhóm nội dung.
+
+\subsection{Naive Bayes}
+Trong dự án này, nhóm lựa chọn sử dụng Naive Bayes làm thuật toán phân loại cốt lõi dựa trên nền tảng xác suất thống kê. Thuật toán vận hành dựa trên Định lý Bayes:
+
+$$P(c|x) = \frac{P(x|c)P(c)}{P(x)}$$
+
+Trong đó, $P(c|x)$ là xác suất đối tượng thuộc lớp $c$ khi đã biết đặc trưng $x$. Nhờ tối ưu hóa bằng cách bỏ qua việc tính toán các phân phối xác suất chung phức tạp, Naive Bayes đặc biệt hiệu quả trong việc xử lý các tập dữ liệu có số chiều lớn.
+
+\subsection{Multinomial Naive Bayes}
+Nhóm triển khai biến thể Multinomial Naive Bayes (MNB) để tối ưu hóa việc phân loại dựa trên dữ liệu rời rạc (tần suất từ khóa). Xác suất của một vector đặc trưng $x$ thuộc về lớp $c$ được tính toán thông qua công thức:
+
+$$P(c|x) \propto P(c) \prod_{i=1}^{n} P(x_i|c)^{f_i}$$
+
+Trong đó, $f_i$ là tần suất của đặc trưng $i$ trong mẫu dữ liệu. Kỹ thuật Laplace Smoothing được sử dụng để khắc phục hiện tượng xác suất bằng 0.
+
+\subsection{Logistic Regression}
+Logistic Regression (Hồi quy Logistic) là một thuật toán phân loại cơ bản nhưng hiệu quả, thường được sử dụng làm cơ sở (baseline) cho các bài toán phân loại nhị phân. Mặc dù có tên là "hồi quy", thuật toán này được sử dụng để dự đoán xác suất một mẫu dữ liệu thuộc về một lớp cụ thể (trong bài toán này là \textit{Độc hại} hoặc \textit{Lành tính}).
+
+Mô hình sử dụng hàm Sigmoid để chuyển đổi đầu ra của hàm tuyến tính thành một giá trị xác suất nằm trong khoảng $(0, 1)$. Công thức hàm giả thuyết được biểu diễn như sau:
+
+\begin{equation}
+    P(y=1|x) = \sigma(w^T x + b) = \frac{1}{1 + e^{-(w^T x + b)}}
+\end{equation}
+
+Trong đó:
+\begin{itemize}
+    \item $x$: Vector đặc trưng đầu vào.
+    \item $w$: Vector trọng số (weights) cần học.
+    \item $b$: Hệ số chệch (bias).
+    \item $\sigma(z)$: Hàm kích hoạt Sigmoid.
+\end{itemize}
+
+Quyết định phân loại được đưa ra dựa trên ngưỡng (threshold), thường là 0.5. Nếu $P(y=1|x) \geq 0.5$, mẫu được phân loại là độc hại, và ngược lại.
+
+\subsection{Support Vector Machine (SVM)}
+Support Vector Machine (Máy vector hỗ trợ) là một thuật toán học máy giám sát mạnh mẽ, hoạt động dựa trên nguyên tắc tìm kiếm một siêu phẳng (hyperplane) quyết định trong không gian $N$ chiều (với $N$ là số lượng đặc trưng) để phân tách các lớp dữ liệu sao cho khoảng cách (margin) giữa siêu phẳng và các điểm dữ liệu gần nhất (support vectors) là lớn nhất.
+
+Trong bài toán này, nhóm thực nghiệm với hai loại nhân (kernel) phổ biến của SVM:
+
+\subsubsection{SVM Linear (Nhân tuyến tính)}
+SVM Linear được sử dụng khi dữ liệu có thể phân tách một cách tuyến tính. Đây là phiên bản đơn giản nhất của SVM, với tốc độ huấn luyện nhanh và ít tham số cần tinh chỉnh. Hàm quyết định của SVM Linear có dạng:
+
+\begin{equation}
+    f(x) = \text{sign}(w^T x + b)
+\end{equation}
+
+Mục tiêu là tối thiểu hóa hàm mất mát Hinge Loss kèm theo thành phần điều chuẩn (regularization) để tránh overfitting.
+
+\subsubsection{SVM RBF (Radial Basis Function)}
+Đối với các dữ liệu phức tạp không thể phân tách tuyến tính trong không gian gốc, nhóm sử dụng SVM với nhân RBF (còn gọi là nhân Gaussian). Kỹ thuật "Kernel trick" cho phép ánh xạ dữ liệu từ không gian đặc trưng ban đầu sang không gian nhiều chiều hơn (thậm chí vô hạn chiều), nơi mà việc phân tách tuyến tính trở nên khả thi.
+
+Hàm nhân RBF được định nghĩa như sau:
+
+\begin{equation}
+    K(x_i, x_j) = \exp(-\gamma ||x_i - x_j||^2)
+\end{equation}
+
+Trong đó:
+\begin{itemize}
+    \item $||x_i - x_j||^2$: Khoảng cách Euclid bình phương giữa hai vector đặc trưng.
+    \item $\gamma$: Tham số kiểm soát tầm ảnh hưởng của một mẫu dữ liệu huấn luyện đơn lẻ. Giá trị $\gamma$ lớn dẫn đến biên quyết định phức tạp và dễ bị overfitting, trong khi $\gamma$ nhỏ làm cho biên quyết định mượt mà hơn.
+\end{itemize}
+
+\subsection{Random Forest}
+Random Forest (Rừng ngẫu nhiên) là một thuật toán học máy tổ hợp (Ensemble Learning) dựa trên mô hình cây quyết định (Decision Tree). Thay vì dựa vào một cây quyết định duy nhất dễ bị nhiễu và overfitting, Random Forest xây dựng một "rừng" gồm nhiều cây quyết định trong quá trình huấn luyện.
+
+Thuật toán hoạt động dựa trên phương pháp Bagging (Bootstrap Aggregating):
+\begin{enumerate}
+    \item \textbf{Bootstrap:} Mỗi cây trong rừng được huấn luyện trên một tập con ngẫu nhiên của dữ liệu gốc (có hoàn lại).
+    \item \textbf{Random Feature Selection:} Tại mỗi nút phân chia của cây, chỉ một tập hợp ngẫu nhiên các đặc trưng được xem xét để tìm ra đặc trưng phân loại tốt nhất.
+\end{enumerate}
+
+Kết quả dự đoán cuối cùng của mô hình đối với bài toán phân loại được xác định bằng cơ chế bỏ phiếu số đông (majority voting) từ tất cả các cây thành phần:
+
+\begin{equation}
+    \hat{y} = \text{mode} \{h_1(x), h_2(x), ..., h_T(x)\}
+\end{equation}
+
+Trong đó $h_t(x)$ là kết quả dự đoán của cây thứ $t$ và $T$ là tổng số cây trong rừng. Random Forest có ưu điểm vượt trội trong việc xử lý dữ liệu nhiều chiều, chống overfitting tốt và cung cấp đánh giá về độ quan trọng của các đặc trưng (feature importance).
+
+\subsection{Kiểm chứng chéo (K-Fold Cross Validation)}
+Để đánh giá độ ổn định, nhóm sử dụng kỹ thuật Kiểm chứng chéo $K$ lần. Kết quả cuối cùng là giá trị trung bình cộng của các chỉ số đánh giá thu được qua $K$ lần thực nghiệm:
+$$E = \frac{1}{K} \sum_{i=1}^{K} E_i$$
+Nhóm sử dụng kỹ thuật \textbf{Stratified K-Fold} để đảm bảo tỷ lệ nhãn phân loại cân bằng trong mỗi fold.
+
+\textit{(Phần nội dung này chưa có trong dữ liệu đầu vào)}
+
+\section{Đánh giá mô hình}
+Hiệu năng phân loại nội dung website được đo lường thông qua các chỉ số:
+\begin{itemize}
+    \item \textbf{Precision:} $Precision = \frac{TP}{TP + FP}$
+    \item \textbf{Recall:} $Recall = \frac{TP}{TP + FN}$
+    \item \textbf{F1-Score:} $F1 = 2 \times \frac{Precision \times Recall}{Precision + Recall}$
+\end{itemize}
+
+% --- CHƯƠNG 5 ---
+\chapter{KẾT QUẢ MÔ HÌNH}
+
+\section{Kết quả Kiểm chứng chéo (Cross-Validation)}
+Quá trình thực nghiệm sử dụng kỹ thuật Stratified 10-Fold Cross-Validation cho kết quả trung bình:
+\begin{itemize}
+    \item Độ chính xác trung bình (Mean Accuracy): [...]
+    \item Độ lệch chuẩn (Standard Deviation): $\pm$[...]
+\end{itemize}
+
+\section{Hiệu năng phân loại trên tập kiểm thử}
+Kết quả tổng quan đạt được trên tập Test set:
+\begin{itemize}
+    \item Độ chính xác trên tập kiểm thử (Test Accuracy): [...]
+    \item Thời gian dự đoán (Prediction Time): [...] giây.
+\end{itemize}
+
+\textbf{Bảng chi tiết các chỉ số hiệu năng:}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|c|c|c|c|}
+    \hline
+    \textbf{Phân lớp (Class)} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} & \textbf{Support} \\ \hline
+    Adult & [...] & [...] & [...] & [...] \\ \hline
+    Good & [...] & [...] & [...] & [...] \\ \hline
+    Illegal & [...] & [...] & [...] & [...] \\ \hline
+    \textbf{Macro avg} & [...] & [...] & [...] & [...] \\ \hline
+    \textbf{Weighted avg} & [...] & [...] & [...] & [...] \\ \hline
+    \end{tabular}
+    \caption{Báo cáo phân loại chi tiết}
+\end{table}
+
+\textbf{Nhận xét:} Dựa trên bảng số liệu, mô hình đạt hiệu suất cao nhất ở việc nhận diện nhóm nội dung [...] với F1-Score đạt [...].
+
+\section{Các đặc trưng từ khóa quan trọng (Top Features)}
+Các từ khóa có đóng góp lớn nhất vào quyết định phân loại:
+\begin{itemize}
+    \item \textbf{Nhóm Adult:} [...]
+    \item \textbf{Nhóm Illegal:} [...]
+    \item \textbf{Nhóm Good:} [...]
+\end{itemize}
+
+% --- CHƯƠNG 6 ---
+\chapter{KẾT LUẬN}
+\textit{(Phần nội dung này chưa có trong dữ liệu đầu vào)}
+
+\end{document}
