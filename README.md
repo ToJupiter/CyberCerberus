@@ -15,4 +15,5 @@ source .venv/bin/activate
 PYTHONPATH=. python scripts/seed_knowledge_base.py --seed_csv data/classified_domains.csv
 PYTHONPATH=. python scripts/nsfw_domain_ping.py
 PYTHONPATH=. python scripts/illegal_domain_ping.py
+PYTHONPATH=. python scripts/phishing_domain_ping.py
 ```
