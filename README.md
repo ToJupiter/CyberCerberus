@@ -43,6 +43,9 @@ Create a weights/ folder. Put the `.npy` weights inside of the folder.
 ### **2. Data**
 Put the `.parquet` file in the data folder. 
 
-
-## **Training**
+## **Training and inference**
+### **Training**
 Open [prediction notebook](notebooks/final_prediction.ipynb), select the CyberCerberus kernel and Run all.
+
+### **Inference**
+Still working, will push later!
