@@ -1,20 +1,48 @@
-# First guideline
+# CyberCerberus: domain classification with URL, text classification and graph aggregation
 
-To run the graph crawler, place `scripts/seed_knowledge_base.py` along with `src/crawler/spider.py`. The seed_csv for them is `data/classified_domains.csv` and `data/filters.csv` acts as the domain filter.
+## **Install UV on Windows & Linux**
 
-# Environment setup
-Ensure uv is installed
-``` bash
+### **Windows**
+1. **Using PowerShell** (admin recommended):
+   ```powershell
+   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+   - Restart your terminal after installation.
+
+### **Linux/macOS**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+- Restart your shell or run: `source $HOME/.local/bin/env`
+
+---
+
+## **Initialize & Activate Environment**
+
+### **1. Sync dependencies** (both Windows and Linux)
+```bash
 uv sync
+```
+
+### **2. Activate .venv**
+
+**Windows (PowerShell):**
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+**Linux/macOS:**
+```bash
 source .venv/bin/activate
 ```
 
-# Commands
+## **Weights and data**
+### **1. Weights**
+Create a weights/ folder. Put the `.npy` weights inside of the folder.
 
-``` bash
-PYTHONPATH=. python scripts/seed_knowledge_base.py --seed_csv data/classified_domains.csv
-PYTHONPATH=. python scripts/nsfw_domain_ping.py
-PYTHONPATH=. python scripts/illegal_domain_ping.py
-PYTHONPATH=. python scripts/phishing_domain_ping.py
-PYTHONPATH=. python scripts/domain_classification.py
-```
+### **2. Data**
+Put the `.parquet` file in the data folder. 
+
+
+## **Training**
+Open [prediction notebook](notebooks/final_prediction.ipynb), select the CyberCerberus kernel and Run all.
