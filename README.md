@@ -3,11 +3,11 @@
 ## **Install UV on Windows & Linux**
 
 ### **Windows**
-1. **Using PowerShell** (admin recommended):
-   ```powershell
-   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-   ```
-   - Restart your terminal after installation.
+**Using PowerShell** (admin recommended):
+```powershell
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+- Restart your terminal after installation.
 
 ### **Linux/macOS**
 ```bash
